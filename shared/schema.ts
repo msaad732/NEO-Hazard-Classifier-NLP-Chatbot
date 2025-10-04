@@ -16,3 +16,33 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export const earthquakeEventSchema = z.object({
+  id: z.string(),
+  magnitude: z.number(),
+  location: z.string(),
+  depth: z.number(),
+  time: z.number(),
+  latitude: z.number(),
+  longitude: z.number(),
+  url: z.string(),
+  tsunami: z.boolean(),
+  felt: z.number().nullable(),
+  significance: z.number(),
+});
+
+export type EarthquakeEvent = z.infer<typeof earthquakeEventSchema>;
+
+export const tsunamiAlertSchema = z.object({
+  id: z.string(),
+  event: z.string(),
+  severity: z.enum(['warning', 'watch', 'advisory', 'information']),
+  areas: z.array(z.string()),
+  issueTime: z.number(),
+  expires: z.number().nullable(),
+  waveHeight: z.string().nullable(),
+  message: z.string(),
+  url: z.string(),
+});
+
+export type TsunamiAlert = z.infer<typeof tsunamiAlertSchema>;
