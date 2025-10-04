@@ -33,8 +33,8 @@ export function ImpactSimulator() {
 
   return (
     <GlassmorphicPanel data-testid="panel-simulator">
-      <h2 className="text-2xl font-bold text-primary mb-6 font-sans">
-        Impact Simulator
+      <h2 className="text-2xl font-bold text-primary mb-6 font-sans" style={{ textShadow: '0 0 15px rgba(139, 92, 246, 0.5)' }}>
+        💥 Impact Simulator
       </h2>
 
       <div className="space-y-6">

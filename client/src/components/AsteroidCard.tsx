@@ -20,16 +20,16 @@ export function AsteroidCard({
 }: AsteroidCardProps) {
   return (
     <GlassmorphicPanel 
-      className="hover-elevate active-elevate-2 transition-all cursor-pointer"
+      className="hover-elevate active-elevate-2 transition-all cursor-pointer hover:scale-105"
       data-testid={`card-asteroid-${name}`}
     >
       <div className="flex items-start justify-between mb-3">
-        <h3 className="text-primary font-bold text-lg font-mono" data-testid={`text-name-${name}`}>
-          {name}
+        <h3 className="text-primary font-bold text-lg font-mono" data-testid={`text-name-${name}`} style={{ textShadow: '0 0 10px rgba(139, 92, 246, 0.4)' }}>
+          ☄️ {name}
         </h3>
         {hazardous && (
-          <Badge variant="destructive" className="text-xs" data-testid={`badge-hazard-${name}`}>
-            HAZARD
+          <Badge variant="destructive" className="text-xs animate-pulse" data-testid={`badge-hazard-${name}`}>
+            ⚠️ HAZARD
           </Badge>
         )}
       </div>

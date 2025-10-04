@@ -6,6 +6,7 @@ interface Particle {
   opacity: number;
   size: number;
   life: number;
+  color: string;
 }
 
 export function CustomCursor() {
@@ -28,6 +29,8 @@ export function CustomCursor() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
+    const colors = ['#8B5CF6', '#EC4899', '#F59E0B', '#A855F7'];
+
     const handleMouseMove = (e: MouseEvent) => {
       setMousePos({ x: e.clientX, y: e.clientY });
       
@@ -35,8 +38,9 @@ export function CustomCursor() {
         x: e.clientX,
         y: e.clientY,
         opacity: 1,
-        size: Math.random() * 3 + 2,
+        size: Math.random() * 4 + 2,
         life: 1,
+        color: colors[Math.floor(Math.random() * colors.length)],
       });
     };
 
@@ -48,25 +52,25 @@ export function CustomCursor() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       particlesRef.current = particlesRef.current.filter((particle) => {
-        particle.life -= 0.02;
+        particle.life -= 0.015;
         particle.opacity = particle.life;
-        particle.size *= 0.98;
+        particle.size *= 0.97;
 
         if (particle.life > 0) {
-          ctx.fillStyle = `rgba(0, 255, 255, ${particle.opacity * 0.6})`;
+          ctx.fillStyle = particle.color + Math.floor(particle.opacity * 160).toString(16).padStart(2, '0');
           ctx.beginPath();
           ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
           ctx.fill();
 
           const gradient = ctx.createRadialGradient(
             particle.x, particle.y, 0,
-            particle.x, particle.y, particle.size * 2
+            particle.x, particle.y, particle.size * 3
           );
-          gradient.addColorStop(0, `rgba(0, 255, 255, ${particle.opacity * 0.3})`);
-          gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+          gradient.addColorStop(0, particle.color + Math.floor(particle.opacity * 100).toString(16).padStart(2, '0'));
+          gradient.addColorStop(1, particle.color + '00');
           ctx.fillStyle = gradient;
           ctx.beginPath();
-          ctx.arc(particle.x, particle.y, particle.size * 2, 0, Math.PI * 2);
+          ctx.arc(particle.x, particle.y, particle.size * 3, 0, Math.PI * 2);
           ctx.fill();
 
           return true;
@@ -78,23 +82,34 @@ export function CustomCursor() {
       ctx.translate(mousePos.x, mousePos.y);
       ctx.rotate(Math.PI / 4);
       
-      ctx.fillStyle = '#00FFFF';
+      const gradient = ctx.createLinearGradient(0, -10, 0, 10);
+      gradient.addColorStop(0, '#8B5CF6');
+      gradient.addColorStop(0.5, '#A855F7');
+      gradient.addColorStop(1, '#EC4899');
+      
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.moveTo(0, -8);
-      ctx.lineTo(-4, 4);
-      ctx.lineTo(0, 2);
-      ctx.lineTo(4, 4);
+      ctx.moveTo(0, -10);
+      ctx.lineTo(-5, 5);
+      ctx.lineTo(0, 3);
+      ctx.lineTo(5, 5);
       ctx.closePath();
       ctx.fill();
 
-      ctx.fillStyle = '#FFD700';
-      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = '#F59E0B';
+      ctx.globalAlpha = 0.8;
       ctx.beginPath();
-      ctx.moveTo(0, 2);
-      ctx.lineTo(-2, 8);
-      ctx.lineTo(0, 6);
-      ctx.lineTo(2, 8);
+      ctx.moveTo(0, 3);
+      ctx.lineTo(-3, 10);
+      ctx.lineTo(0, 7);
+      ctx.lineTo(3, 10);
       ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, 2, 0, Math.PI * 2);
       ctx.fill();
       
       ctx.restore();

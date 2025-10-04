@@ -91,10 +91,10 @@ export function AIChat() {
 
   return (
     <GlassmorphicPanel className="flex flex-col h-[600px]" data-testid="panel-chat">
-      <div className="flex items-center gap-2 mb-4 pb-4 border-b border-primary/30">
-        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-        <h2 className="text-xl font-bold text-primary font-sans">
-          AI Defense Analyst
+      <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-primary/40">
+        <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
+        <h2 className="text-2xl font-bold text-primary font-sans" style={{ textShadow: '0 0 15px rgba(139, 92, 246, 0.5)' }}>
+          🤖 AI Defense Analyst
         </h2>
       </div>
 

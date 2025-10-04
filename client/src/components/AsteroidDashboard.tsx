@@ -69,8 +69,8 @@ export function AsteroidDashboard() {
       <GlassmorphicPanel>
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-primary font-sans mb-1">
-              Near-Earth Objects
+            <h2 className="text-3xl font-bold text-primary font-sans mb-1" style={{ textShadow: '0 0 20px rgba(139, 92, 246, 0.6)' }}>
+              🌠 Near-Earth Objects
             </h2>
             <p className="text-muted-foreground font-mono text-sm">
               Real-time asteroid tracking & analysis
