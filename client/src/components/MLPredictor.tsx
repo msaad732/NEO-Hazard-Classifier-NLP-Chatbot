@@ -2,12 +2,21 @@ import { useState } from 'react';
 import { GlassmorphicPanel } from './GlassmorphicPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { type MLPredictionInput, type MLPredictionOutput } from '@shared/schema';
+import { mlPredictionInputSchema, type MLPredictionInput, type MLPredictionOutput } from '@shared/schema';
 import { Loader2, Sparkles } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Bar,
@@ -23,12 +32,16 @@ import {
 export function MLPredictor() {
   const { toast } = useToast();
   const [prediction, setPrediction] = useState<MLPredictionOutput | null>(null);
-  const [formData, setFormData] = useState<MLPredictionInput>({
-    diameter: 0.5,
-    velocity: 20,
-    distance: 100000,
-    mass: 1e12,
-    trajectoryAngle: 45,
+
+  const form = useForm<MLPredictionInput>({
+    resolver: zodResolver(mlPredictionInputSchema),
+    defaultValues: {
+      diameter: 0.5,
+      velocity: 20,
+      distance: 100000,
+      mass: 1e12,
+      trajectoryAngle: 45,
+    },
   });
 
   const predictMutation = useMutation({
@@ -40,7 +53,7 @@ export function MLPredictor() {
       setPrediction(data);
       toast({
         title: 'Prediction Complete',
-        description: `Risk Level: ${data.riskLevel.toUpperCase()}`,
+        description: `Risk Level: ${data.riskLevel?.toUpperCase() || 'UNKNOWN'}`,
       });
     },
     onError: (error) => {
@@ -52,25 +65,20 @@ export function MLPredictor() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    predictMutation.mutate(formData);
-  };
-
-  const handleInputChange = (field: keyof MLPredictionInput, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: parseFloat(value) || 0 }));
+  const handleSubmit = (data: MLPredictionInput) => {
+    predictMutation.mutate(data);
   };
 
   const chartData = prediction
     ? [
         {
           name: 'Impact Probability',
-          value: prediction.impactProbability,
+          value: typeof prediction.impactProbability === 'number' ? prediction.impactProbability : 0,
           fill: 'hsl(var(--primary))',
         },
         {
           name: 'Energy (MT)',
-          value: prediction.estimatedEnergy || 0,
+          value: typeof prediction.estimatedEnergy === 'number' ? prediction.estimatedEnergy : 0,
           fill: 'hsl(var(--accent))',
         },
       ]
@@ -101,100 +109,132 @@ export function MLPredictor() {
           </h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="diameter" className="text-foreground">
-              Diameter (km)
-            </Label>
-            <Input
-              id="diameter"
-              type="number"
-              step="0.001"
-              value={formData.diameter}
-              onChange={(e) => handleInputChange('diameter', e.target.value)}
-              className="bg-input border-primary font-mono"
-              data-testid="input-diameter"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="diameter"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-foreground">Diameter (km)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                      className="bg-input border-primary font-mono"
+                      data-testid="input-diameter"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="velocity" className="text-foreground">
-              Velocity (km/s)
-            </Label>
-            <Input
-              id="velocity"
-              type="number"
-              step="0.1"
-              value={formData.velocity}
-              onChange={(e) => handleInputChange('velocity', e.target.value)}
-              className="bg-input border-primary font-mono"
-              data-testid="input-velocity"
+            <FormField
+              control={form.control}
+              name="velocity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-foreground">Velocity (km/s)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                      className="bg-input border-primary font-mono"
+                      data-testid="input-velocity"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="distance" className="text-foreground">
-              Distance from Earth (km)
-            </Label>
-            <Input
-              id="distance"
-              type="number"
-              step="1000"
-              value={formData.distance}
-              onChange={(e) => handleInputChange('distance', e.target.value)}
-              className="bg-input border-primary font-mono"
-              data-testid="input-distance"
+            <FormField
+              control={form.control}
+              name="distance"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-foreground">Distance from Earth (km)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="1000"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                      className="bg-input border-primary font-mono"
+                      data-testid="input-distance"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="mass" className="text-foreground">
-              Mass (kg)
-            </Label>
-            <Input
-              id="mass"
-              type="number"
-              step="1e10"
-              value={formData.mass}
-              onChange={(e) => handleInputChange('mass', e.target.value)}
-              className="bg-input border-primary font-mono"
-              data-testid="input-mass"
+            <FormField
+              control={form.control}
+              name="mass"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-foreground">Mass (kg)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="1e10"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                      className="bg-input border-primary font-mono"
+                      data-testid="input-mass"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="trajectoryAngle" className="text-foreground">
-              Trajectory Angle (degrees)
-            </Label>
-            <Input
-              id="trajectoryAngle"
-              type="number"
-              step="1"
-              min="0"
-              max="90"
-              value={formData.trajectoryAngle}
-              onChange={(e) => handleInputChange('trajectoryAngle', e.target.value)}
-              className="bg-input border-primary font-mono"
-              data-testid="input-trajectory"
+            <FormField
+              control={form.control}
+              name="trajectoryAngle"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-foreground">Trajectory Angle (degrees)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="90"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                      className="bg-input border-primary font-mono"
+                      data-testid="input-trajectory"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={predictMutation.isPending}
-            data-testid="button-predict"
-          >
-            {predictMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Calculating...
-              </>
-            ) : (
-              'Run Prediction'
-            )}
-          </Button>
-        </form>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={predictMutation.isPending}
+              data-testid="button-predict"
+            >
+              {predictMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Calculating...
+                </>
+              ) : (
+                'Run Prediction'
+              )}
+            </Button>
+          </form>
+        </Form>
       </GlassmorphicPanel>
 
       <div className="space-y-6">
@@ -206,28 +246,30 @@ export function MLPredictor() {
                 <div className="flex justify-between items-center p-3 bg-primary/10 rounded-md border border-primary/40">
                   <span className="text-foreground font-mono">Impact Probability:</span>
                   <span className="text-primary font-bold" data-testid="text-probability">
-                    {prediction.impactProbability.toFixed(2)}%
+                    {typeof prediction.impactProbability === 'number' 
+                      ? prediction.impactProbability.toFixed(2) 
+                      : '0.00'}%
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center p-3 bg-primary/10 rounded-md border border-primary/40">
                   <span className="text-foreground font-mono">Risk Level:</span>
-                  <span className={`font-bold ${getRiskColor(prediction.riskLevel)}`} data-testid="text-risk-level">
-                    {prediction.riskLevel.toUpperCase()}
+                  <span className={`font-bold ${getRiskColor(prediction.riskLevel || 'low')}`} data-testid="text-risk-level">
+                    {(prediction.riskLevel || 'UNKNOWN').toUpperCase()}
                   </span>
                 </div>
 
                 <div className="p-3 bg-primary/10 rounded-md border border-primary/40">
                   <span className="text-foreground font-mono block mb-2">Potential Damage:</span>
                   <span className="text-muted-foreground text-sm" data-testid="text-damage">
-                    {prediction.potentialDamage}
+                    {prediction.potentialDamage || 'Unknown'}
                   </span>
                 </div>
 
                 <div className="p-3 bg-primary/10 rounded-md border border-primary/40">
                   <span className="text-foreground font-mono block mb-2">Recommended Action:</span>
                   <span className="text-muted-foreground text-sm" data-testid="text-action">
-                    {prediction.recommendedAction}
+                    {prediction.recommendedAction || 'Monitor closely'}
                   </span>
                 </div>
               </div>

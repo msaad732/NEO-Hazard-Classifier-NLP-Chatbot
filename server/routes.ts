@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { type EarthquakeEvent, type TsunamiAlert } from "@shared/schema";
+import { type EarthquakeEvent, type TsunamiAlert, mlPredictionInputSchema, type MLPredictionOutput } from "@shared/schema";
 
 async function fetchEarthquakes(): Promise<EarthquakeEvent[]> {
   try {
@@ -149,11 +149,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/ml/predict', async (req, res) => {
     try {
-      const { diameter, velocity, distance, mass, trajectoryAngle } = req.body;
+      const validationResult = mlPredictionInputSchema.safeParse(req.body);
       
-      if (!diameter || !velocity || !distance || !mass || trajectoryAngle === undefined) {
-        return res.status(400).json({ error: 'All prediction parameters are required' });
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: 'Invalid prediction parameters', 
+          details: validationResult.error.errors 
+        });
       }
+
+      const { diameter, velocity, distance, mass, trajectoryAngle } = validationResult.data;
 
       const response = await fetch('https://nasa-hackathon-ml-model.streamlit.app/predict', {
         method: 'POST',
@@ -173,8 +178,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('Failed to get prediction from ML model');
       }
 
-      const data = await response.json();
-      res.json(data);
+      const rawData = await response.json();
+      
+      const transformedData: MLPredictionOutput = {
+        impactProbability: Number(rawData.impact_probability || rawData.impactProbability) || 0,
+        riskLevel: (rawData.risk_level || rawData.riskLevel || 'low') as 'low' | 'medium' | 'high' | 'critical',
+        potentialDamage: String(rawData.potential_damage || rawData.potentialDamage || 'Unknown'),
+        recommendedAction: String(rawData.recommended_action || rawData.recommendedAction || 'Monitor closely'),
+        estimatedEnergy: rawData.estimated_energy || rawData.estimatedEnergy 
+          ? Number(rawData.estimated_energy || rawData.estimatedEnergy) 
+          : undefined,
+      };
+      
+      res.json(transformedData);
     } catch (error) {
       console.error('Error calling ML model API:', error);
       res.status(500).json({ error: 'Failed to get ML prediction' });
