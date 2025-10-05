@@ -46,3 +46,23 @@ export const tsunamiAlertSchema = z.object({
 });
 
 export type TsunamiAlert = z.infer<typeof tsunamiAlertSchema>;
+
+export const mlPredictionInputSchema = z.object({
+  diameter: z.number().min(0.001).max(1000),
+  velocity: z.number().min(0.1).max(100),
+  distance: z.number().min(1).max(1000000),
+  mass: z.number().min(1).max(1e15),
+  trajectoryAngle: z.number().min(0).max(90),
+});
+
+export type MLPredictionInput = z.infer<typeof mlPredictionInputSchema>;
+
+export const mlPredictionOutputSchema = z.object({
+  impactProbability: z.number(),
+  riskLevel: z.enum(['low', 'medium', 'high', 'critical']),
+  potentialDamage: z.string(),
+  recommendedAction: z.string(),
+  estimatedEnergy: z.number().optional(),
+});
+
+export type MLPredictionOutput = z.infer<typeof mlPredictionOutputSchema>;
