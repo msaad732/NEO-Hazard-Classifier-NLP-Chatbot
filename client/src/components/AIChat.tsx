@@ -70,12 +70,12 @@ export function AIChat() {
     setIsTyping(true);
 
     try {
-      const response = await fetch('https://chatbot-nasa-7ikr.onrender.com/', {
+      const response = await fetch('/api/chatbot', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: currentInput }),
+        body: JSON.stringify({ question: currentInput }),
       });
 
       if (!response.ok) {
@@ -83,7 +83,7 @@ export function AIChat() {
       }
 
       const data = await response.json();
-      const aiResponse = data.response || data.message || 'No response received';
+      const aiResponse = data.response || data.answer || data.message || 'No response received';
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),

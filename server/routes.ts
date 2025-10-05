@@ -119,6 +119,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/chatbot', async (req, res) => {
+    try {
+      const { question } = req.body;
+      
+      if (!question) {
+        return res.status(400).json({ error: 'Question is required' });
+      }
+
+      const response = await fetch('https://chatbot-nasa-7ikr.onrender.com/chatbot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from chatbot');
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error calling chatbot API:', error);
+      res.status(500).json({ error: 'Failed to get chatbot response' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
