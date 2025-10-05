@@ -5,8 +5,9 @@ import { GlassmorphicPanel } from '@/components/GlassmorphicPanel';
 import { ImpactSimulator } from '@/components/ImpactSimulator';
 import { AIChat } from '@/components/AIChat';
 import { AsteroidDashboard } from '@/components/AsteroidDashboard';
+import { MLPredictor } from '@/components/MLPredictor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Activity, MessageSquare, BarChart3 } from 'lucide-react';
+import { Shield, Activity, MessageSquare, BarChart3, Sparkles } from 'lucide-react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -42,7 +43,7 @@ export default function Home() {
         <main className="max-w-7xl mx-auto p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <GlassmorphicPanel className="p-3">
-              <TabsList className="grid w-full grid-cols-4 bg-transparent gap-3">
+              <TabsList className="grid w-full grid-cols-5 bg-transparent gap-2">
                 <TabsTrigger 
                   value="dashboard" 
                   data-testid="tab-dashboard"
@@ -58,6 +59,14 @@ export default function Home() {
                 >
                   <Activity className="w-4 h-4 mr-2" />
                   Simulator
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="ml-predictor" 
+                  data-testid="tab-ml-predictor"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-mono text-sm sm:text-base transition-all hover:scale-105"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  ML Predictor
                 </TabsTrigger>
                 <TabsTrigger 
                   value="chat" 
@@ -105,6 +114,10 @@ export default function Home() {
                   </div>
                 </GlassmorphicPanel>
               </div>
+            </TabsContent>
+
+            <TabsContent value="ml-predictor">
+              <MLPredictor />
             </TabsContent>
 
             <TabsContent value="chat">
