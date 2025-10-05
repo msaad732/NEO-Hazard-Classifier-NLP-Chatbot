@@ -25,10 +25,10 @@ export default function Home() {
                 <Shield className="w-10 h-10 text-primary animate-pulse-glow" data-testid="icon-logo" />
                 <div>
                   <h1 className="text-3xl font-bold text-primary font-sans tracking-wide" style={{ textShadow: '0 0 20px rgba(139, 92, 246, 0.6)' }}>
-                    PLANETARY DEFENCE HUB
+                    NEO-SENTINEL
                   </h1>
                   <p className="text-xs text-muted-foreground font-mono">
-                    🌌 Advanced Asteroid Impact Monitoring System
+                    Empowering Planetary Defense
                   </p>
                 </div>
               </div>
