@@ -147,6 +147,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/ml/predict', async (req, res) => {
+    try {
+      const { diameter, velocity, distance, mass, trajectoryAngle } = req.body;
+      
+      if (!diameter || !velocity || !distance || !mass || trajectoryAngle === undefined) {
+        return res.status(400).json({ error: 'All prediction parameters are required' });
+      }
+
+      const response = await fetch('https://nasa-hackathon-ml-model.streamlit.app/predict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          diameter,
+          velocity,
+          distance,
+          mass,
+          trajectory_angle: trajectoryAngle,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get prediction from ML model');
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error calling ML model API:', error);
+      res.status(500).json({ error: 'Failed to get ML prediction' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
