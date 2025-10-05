@@ -55,7 +55,7 @@ export function AIChat() {
     }, 30);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() || isTyping) return;
 
     const userMessage: Message = {
@@ -65,17 +65,26 @@ export function AIChat() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
     setInput('');
     setIsTyping(true);
 
-    const responses = [
-      'Based on current trajectory analysis, the asteroid poses a minimal threat. Estimated miss distance: 450,000 km.',
-      'Impact probability calculated at 0.003%. Recommend continued monitoring for the next 72 hours.',
-      'Simulating deflection scenarios... Nuclear option success rate: 67%. Kinetic impactor success rate: 82%.',
-      'Historical data suggests similar objects have passed safely. However, I recommend activating early warning protocols.',
-    ];
+    try {
+      const response = await fetch('https://chatbot-nasa-7ikr.onrender.com/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: currentInput }),
+      });
 
-    setTimeout(() => {
+      if (!response.ok) {
+        throw new Error('Failed to get response from chatbot');
+      }
+
+      const data = await response.json();
+      const aiResponse = data.response || data.message || 'No response received';
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'ai',
@@ -84,9 +93,18 @@ export function AIChat() {
       };
       setMessages((prev) => [...prev, aiMessage]);
       
-      const response = responses[Math.floor(Math.random() * responses.length)];
-      simulateTyping(response, aiMessage.id);
-    }, 500);
+      simulateTyping(aiResponse, aiMessage.id);
+    } catch (error) {
+      console.error('Error calling chatbot API:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: 'Error connecting to defense systems. Please try again.',
+        typing: false,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setIsTyping(false);
+    }
   };
 
   return (
