@@ -1,23 +1,24 @@
-import { useState } from 'react';
-import { GlassmorphicPanel } from './GlassmorphicPanel';
+import { Panel, PanelHeader, Readout } from './Panel';
+import { RiskChip, toSeverity } from './RiskChip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { mlPredictionInputSchema, type MLPredictionInput, type MLPredictionOutput } from '@shared/schema';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Activity, TriangleAlert } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Bar,
   BarChart,
@@ -25,20 +26,28 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  RadialBarChart,
-  RadialBar,
-  PolarAngleAxis,
-  LineChart,
-  Line,
-  Area,
-  AreaChart,
+  Cell,
 } from 'recharts';
+import { formatScientific } from '@/lib/format';
+
+const FIELDS = [
+  { name: 'diameter', label: 'Diameter', unit: 'km', step: '0.001', help: 'Mean physical diameter.' },
+  { name: 'velocity', label: 'Relative speed', unit: 'km/s', step: '0.1', help: 'Speed at closest approach.' },
+  { name: 'distance', label: 'Miss distance', unit: 'km', step: '1000', help: 'Nominal closest approach.' },
+  { name: 'mass', label: 'Mass', unit: 'kg', step: '1e10', help: 'Estimated bulk mass.' },
+  { name: 'trajectoryAngle', label: 'Trajectory angle', unit: 'deg', step: '1', help: '0 grazing, 90 head-on.' },
+] as const;
+
+const SEVERITY_LABEL = {
+  nominal: 'Low',
+  elevated: 'Medium',
+  high: 'High',
+  critical: 'Critical',
+} as const;
 
 export function MLPredictor() {
   const { toast } = useToast();
-  const [prediction, setPrediction] = useState<MLPredictionOutput | null>(null);
 
   const form = useForm<MLPredictionInput>({
     resolver: zodResolver(mlPredictionInputSchema),
@@ -51,366 +60,281 @@ export function MLPredictor() {
     },
   });
 
-  const predictMutation = useMutation({
-    mutationFn: async (data: MLPredictionInput) => {
+  const predict = useMutation<MLPredictionOutput, Error, MLPredictionInput>({
+    mutationFn: async (data) => {
       const response = await apiRequest('POST', '/api/ml/predict', data);
       return response.json();
     },
     onSuccess: (data) => {
-      setPrediction(data);
       toast({
-        title: 'Prediction Complete',
-        description: `Risk Level: ${data.riskLevel?.toUpperCase() || 'UNKNOWN'}`,
+        title: 'Prediction complete',
+        description: `Assessed risk: ${(data.riskLevel ?? 'unknown').toUpperCase()}`,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Prediction Failed',
-        description: error instanceof Error ? error.message : 'Failed to get prediction',
+        title: 'Prediction failed',
+        description: error.message || 'Could not reach the model service.',
         variant: 'destructive',
       });
     },
   });
 
-  const handleSubmit = (data: MLPredictionInput) => {
-    predictMutation.mutate(data);
-  };
+  const prediction = predict.data;
+  const severity = prediction ? toSeverity(prediction.riskLevel) : null;
 
-  const chartData = prediction
+  const metrics = prediction
     ? [
         {
-          name: 'Impact Probability',
+          name: 'Impact probability',
           value: typeof prediction.impactProbability === 'number' ? prediction.impactProbability : 0,
-          fill: 'hsl(var(--primary))',
+          fill: 'hsl(var(--chart-1))',
         },
         {
-          name: 'Energy (MT)',
+          name: 'Energy (Mt)',
           value: typeof prediction.estimatedEnergy === 'number' ? prediction.estimatedEnergy : 0,
-          fill: 'hsl(var(--accent))',
+          fill: 'hsl(var(--chart-2))',
         },
       ]
     : [];
-
-  const riskLevelData = prediction
-    ? [
-        {
-          name: 'Risk Level',
-          value: prediction.riskLevel === 'critical' ? 100 : 
-                 prediction.riskLevel === 'high' ? 75 :
-                 prediction.riskLevel === 'medium' ? 50 : 25,
-          fill: prediction.riskLevel === 'critical' ? '#ef4444' :
-                prediction.riskLevel === 'high' ? '#f97316' :
-                prediction.riskLevel === 'medium' ? '#eab308' : '#22c55e',
-        },
-      ]
-    : [];
-
-  const comparisonData = prediction
-    ? [
-        {
-          metric: 'Impact Probability',
-          current: typeof prediction.impactProbability === 'number' ? prediction.impactProbability : 0,
-          threshold: 10,
-        },
-        {
-          metric: 'Energy (MT)',
-          current: typeof prediction.estimatedEnergy === 'number' ? prediction.estimatedEnergy : 0,
-          threshold: typeof prediction.estimatedEnergy === 'number' ? prediction.estimatedEnergy * 0.5 : 0,
-        },
-      ]
-    : [];
-
-  const getRiskColor = (level: string) => {
-    switch (level) {
-      case 'low':
-        return 'text-green-500';
-      case 'medium':
-        return 'text-yellow-500';
-      case 'high':
-        return 'text-orange-500';
-      case 'critical':
-        return 'text-red-500';
-      default:
-        return 'text-primary';
-    }
-  };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <GlassmorphicPanel data-testid="panel-ml-form">
-        <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-primary/40">
-          <Sparkles className="w-6 h-6 text-primary" data-testid="icon-ml" />
-          <h2 className="text-2xl font-bold text-primary font-sans" style={{ textShadow: '0 0 15px rgba(139, 92, 246, 0.5)' }}>
-            Impact Predictor
-          </h2>
-        </div>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <Panel className="lg:col-span-5">
+        <PanelHeader
+          title="Risk predictor"
+          description="Classifies threat level from physical and orbital parameters."
+        />
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="diameter"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-foreground">Diameter (km)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      className="bg-input border-primary font-mono"
-                      data-testid="input-diameter"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="velocity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-foreground">Velocity (km/s)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      className="bg-input border-primary font-mono"
-                      data-testid="input-velocity"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="distance"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-foreground">Distance from Earth (km)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="1000"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      className="bg-input border-primary font-mono"
-                      data-testid="input-distance"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="mass"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-foreground">Mass (kg)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="1e10"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      className="bg-input border-primary font-mono"
-                      data-testid="input-mass"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="trajectoryAngle"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-foreground">Trajectory Angle (degrees)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="90"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      className="bg-input border-primary font-mono"
-                      data-testid="input-trajectory"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form
+            onSubmit={form.handleSubmit((data) => predict.mutate(data))}
+            className="mt-6 space-y-5"
+          >
+            {FIELDS.map(({ name, label, unit, step, help }) => (
+              <FormField
+                key={name}
+                control={form.control}
+                name={name}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-baseline justify-between gap-3 text-sm font-normal text-foreground">
+                      <span>{label}</span>
+                      <span className="font-mono text-2xs text-muted-foreground">{unit}</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step={step}
+                        {...field}
+                        value={Number.isFinite(field.value) ? field.value : ''}
+                        onChange={(e) => {
+                          const next = parseFloat(e.target.value);
+                          field.onChange(Number.isNaN(next) ? undefined : next);
+                        }}
+                        className="font-mono tnum"
+                        data-testid={`input-${name}`}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs text-muted-foreground">
+                      {help}
+                    </FormDescription>
+                    <FormMessage className="text-xs text-status-critical" />
+                  </FormItem>
+                )}
+              />
+            ))}
 
             <Button
               type="submit"
               className="w-full"
-              disabled={predictMutation.isPending}
+              disabled={predict.isPending}
               data-testid="button-predict"
             >
-              {predictMutation.isPending ? (
+              {predict.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Calculating...
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                  Evaluating
                 </>
               ) : (
-                'Run Prediction'
+                'Run prediction'
               )}
             </Button>
           </form>
         </Form>
-      </GlassmorphicPanel>
+      </Panel>
 
-      <div className="space-y-6">
-        {prediction && (
+      <div className="space-y-6 lg:col-span-7">
+        {predict.isPending && (
+          <Panel data-testid="panel-ml-loading">
+            <Skeleton className="h-5 w-44" />
+            <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-7 border-t border-border pt-6">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i}>
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="mt-2.5 h-6 w-20" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="mt-6 h-[220px] w-full" />
+          </Panel>
+        )}
+
+        {!predict.isPending && predict.isError && (
+          <Panel
+            className="flex min-h-[320px] flex-col items-center justify-center py-12 text-center"
+            data-testid="panel-ml-error"
+          >
+            <TriangleAlert className="h-6 w-6 text-status-critical" aria-hidden="true" />
+            <p className="mt-4 text-sm font-medium text-foreground">Prediction failed</p>
+            <p className="mt-1 max-w-[44ch] text-sm text-muted-foreground">
+              {predict.error?.message || 'The model service did not respond.'}
+            </p>
+            <Button
+              variant="outline"
+              className="mt-5"
+              onClick={() => predict.mutate(form.getValues())}
+              data-testid="button-retry-predict"
+            >
+              Try again
+            </Button>
+          </Panel>
+        )}
+
+        {!predict.isPending && prediction && severity && (
           <>
-            <GlassmorphicPanel data-testid="panel-ml-results">
-              <h3 className="text-xl font-bold text-primary mb-4">Prediction Results</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-primary/10 rounded-md border border-primary/40">
-                  <span className="text-foreground font-mono">Impact Probability:</span>
-                  <span className="text-primary font-bold" data-testid="text-probability">
-                    {typeof prediction.impactProbability === 'number' 
-                      ? prediction.impactProbability.toFixed(2) 
-                      : '0.00'}%
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center p-3 bg-primary/10 rounded-md border border-primary/40">
-                  <span className="text-foreground font-mono">Risk Level:</span>
-                  <span className={`font-bold ${getRiskColor(prediction.riskLevel || 'low')}`} data-testid="text-risk-level">
-                    {(prediction.riskLevel || 'UNKNOWN').toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="p-3 bg-primary/10 rounded-md border border-primary/40">
-                  <span className="text-foreground font-mono block mb-2">Potential Damage:</span>
-                  <span className="text-muted-foreground text-sm" data-testid="text-damage">
-                    {prediction.potentialDamage || 'Unknown'}
-                  </span>
-                </div>
-
-                <div className="p-3 bg-primary/10 rounded-md border border-primary/40">
-                  <span className="text-foreground font-mono block mb-2">Recommended Action:</span>
-                  <span className="text-muted-foreground text-sm" data-testid="text-action">
-                    {prediction.recommendedAction || 'Monitor closely'}
-                  </span>
-                </div>
+            <Panel data-testid="panel-ml-results">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h2 className="text-base font-semibold tracking-tight text-foreground">
+                  Assessment
+                </h2>
+                <RiskChip
+                  severity={severity}
+                  label={SEVERITY_LABEL[severity]}
+                  data-testid="text-risk-level"
+                />
               </div>
-            </GlassmorphicPanel>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <GlassmorphicPanel data-testid="panel-ml-chart">
-                <h3 className="text-xl font-bold text-primary mb-4">Impact Metrics</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
-                    <XAxis dataKey="name" stroke="hsl(var(--foreground))" tick={{ fontSize: 12 }} />
-                    <YAxis stroke="hsl(var(--foreground))" tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        border: '1px solid rgba(139, 92, 246, 0.5)',
-                        borderRadius: '6px',
-                      }}
+              <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-7 border-t border-border pt-6">
+                <Readout
+                  label="Impact probability"
+                  value={
+                    typeof prediction.impactProbability === 'number'
+                      ? prediction.impactProbability.toFixed(2)
+                      : '--'
+                  }
+                  unit="%"
+                  data-testid="text-probability"
+                />
+                <Readout
+                  label="Estimated energy"
+                  value={
+                    typeof prediction.estimatedEnergy === 'number'
+                      ? formatScientific(prediction.estimatedEnergy)
+                      : '--'
+                  }
+                  unit="Mt"
+                  data-testid="text-energy"
+                />
+              </div>
+
+              <dl className="mt-6 divide-y divide-border border-t border-border">
+                <div className="grid grid-cols-3 gap-4 py-3">
+                  <dt className="field-label pt-0.5">Damage</dt>
+                  <dd
+                    className="col-span-2 text-sm leading-snug text-foreground"
+                    data-testid="text-damage"
+                  >
+                    {prediction.potentialDamage || 'Not characterised.'}
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-4 py-3">
+                  <dt className="field-label pt-0.5">Action</dt>
+                  <dd
+                    className="col-span-2 text-sm leading-snug text-foreground"
+                    data-testid="text-action"
+                  >
+                    {prediction.recommendedAction || 'Continue monitoring.'}
+                  </dd>
+                </div>
+              </dl>
+
+              {prediction.source === 'fallback' && (
+                <p
+                  className="mt-5 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground"
+                  data-testid="text-fallback-notice"
+                >
+                  The trained model was unreachable. These figures come from a local
+                  heuristic derived from the parameters above, not from the model.
+                </p>
+              )}
+            </Panel>
+
+            <Panel data-testid="panel-ml-chart">
+              <h3 className="text-base font-semibold tracking-tight text-foreground">
+                Model outputs
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Probability in percent, energy in megatons TNT equivalent.
+              </p>
+              <div className="mt-5 h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={metrics} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
+                    <CartesianGrid
+                      vertical={false}
+                      stroke="hsl(var(--border) / 0.55)"
+                      strokeDasharray="0"
                     />
-                    <Legend />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                    <XAxis
+                      dataKey="name"
+                      stroke="hsl(var(--muted-foreground))"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'hsl(var(--foreground) / 0.04)' }}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                      itemStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                    />
+                    <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={72}>
+                      {metrics.map((entry) => (
+                        <Cell key={entry.name} fill={entry.fill} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </GlassmorphicPanel>
-
-              <GlassmorphicPanel data-testid="panel-ml-risk-gauge">
-                <h3 className="text-xl font-bold text-primary mb-4">Risk Level Gauge</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RadialBarChart
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="60%"
-                    outerRadius="100%"
-                    data={riskLevelData}
-                    startAngle={180}
-                    endAngle={0}
-                  >
-                    <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-                    <RadialBar
-                      background
-                      dataKey="value"
-                      cornerRadius={10}
-                      fill={riskLevelData[0]?.fill || 'hsl(var(--primary))'}
-                    />
-                    <text
-                      x="50%"
-                      y="50%"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="fill-foreground text-2xl font-bold"
-                    >
-                      {prediction?.riskLevel?.toUpperCase() || 'N/A'}
-                    </text>
-                  </RadialBarChart>
-                </ResponsiveContainer>
-              </GlassmorphicPanel>
-            </div>
-
-            <GlassmorphicPanel data-testid="panel-ml-comparison">
-              <h3 className="text-xl font-bold text-primary mb-4">Metrics vs Threshold</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={comparisonData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
-                  <XAxis dataKey="metric" stroke="hsl(var(--foreground))" tick={{ fontSize: 12 }} />
-                  <YAxis stroke="hsl(var(--foreground))" tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                      border: '1px solid rgba(139, 92, 246, 0.5)',
-                      borderRadius: '6px',
-                    }}
-                  />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="current"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.6}
-                    name="Current Value"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="threshold"
-                    stroke="hsl(var(--accent))"
-                    fill="hsl(var(--accent))"
-                    fillOpacity={0.3}
-                    name="Reference Threshold"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </GlassmorphicPanel>
+              </div>
+            </Panel>
           </>
         )}
 
-        {!prediction && (
-          <GlassmorphicPanel className="flex items-center justify-center min-h-[400px]" data-testid="panel-ml-empty">
-            <div className="text-center">
-              <Sparkles className="w-16 h-16 text-primary/40 mx-auto mb-4" />
-              <p className="text-muted-foreground font-mono">
-                Enter asteroid parameters to generate prediction
-              </p>
-            </div>
-          </GlassmorphicPanel>
+        {!predict.isPending && !predict.isError && !prediction && (
+          <Panel
+            className="flex min-h-[320px] flex-col items-center justify-center py-12 text-center"
+            data-testid="panel-ml-empty"
+          >
+            <Activity className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+            <p className="mt-4 text-sm font-medium text-foreground">No assessment yet</p>
+            <p className="mt-1 max-w-[44ch] text-sm text-muted-foreground">
+              Enter the object's parameters and run the prediction to see probability, energy
+              and a recommended response.
+            </p>
+          </Panel>
         )}
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Planetary Defence Hub is a Progressive Web App (PWA) designed as a retro-futuristic space command center for monitoring asteroid impacts, tracking earthquakes and tsunamis, and providing AI-powered planetary defense analysis. The application features a highly stylized "funky, cool, retro-futuristic" aesthetic inspired by 90s sci-fi films, with animated cosmic backgrounds, custom cursors, glassmorphic UI panels, and neon accents.
+Neo-Sentinel is a Progressive Web App (PWA) planetary-defence console for browsing tracked near-Earth objects, modelling hypothetical impacts, classifying risk, and answering questions in plain language. The interface is styled as a scientific instrument: a cool graphite chassis, hairline rules instead of boxes, dense tabular numerals, and a single sodium-orange accent, with colour otherwise reserved for encoding data. See `design_guidelines.md` for the full system.
 
 ## User Preferences
 
@@ -23,13 +23,14 @@ Preferred communication style: Simple, everyday language.
 - Tailwind CSS for utility-first styling with extensive custom theme configuration
 
 **Design System:**
-- Dark mode with deep space aesthetic (inky black backgrounds)
-- Neon accent colors: Electric Blue/Cyan (#00FFFF), Hot Magenta/Pink (#FF00FF), Meteor Yellow/Orange (#FFD700)
-- Custom fonts: Oxanium for headlines (futuristic), Space Mono for monospaced data displays
-- Glassmorphism effect using backdrop-blur and semi-transparent overlays for content containers
-- Animated cosmic background with stars, planets, and celestial bodies on low z-index
-- Custom cursor implementation with particle trail effects
-- Custom loading spinner (rotating meteor with flame tail)
+- Single dark theme, page-wide, driven by HSL tokens in `client/src/index.css`
+- One accent: sodium orange (`--primary`, `28 96% 55%`) for active state, primary CTA, focus ring
+- Semantic risk ramp (`--status-nominal/elevated/high/critical`) used only to encode assessed state
+- Fonts: Geist for interface text, Geist Mono for all numbers and identifiers, with tabular figures
+- Flat `Panel` surfaces with hairline borders and tinted shadows; no glows
+- Shape scale: 6px surfaces, 4px controls, 2px chips
+- Ambient starfield backdrop that halts under `prefers-reduced-motion` and when the tab is hidden
+- Every text pair verified against WCAG AA
 
 **State Management:**
 - React Query (TanStack Query) for server state management, data fetching, and caching
@@ -37,14 +38,24 @@ Preferred communication style: Simple, everyday language.
 - Form state managed via React Hook Form with Zod validation
 
 **Key Custom Components:**
-- `CosmicBackground`: Canvas-based animated space background with particles and celestial objects
-- `CustomCursor`: Canvas-rendered comet cursor with fading particle trail
-- `GlassmorphicPanel`: Reusable container with glassmorphism effects for content areas
-- `AsteroidCard`, `AsteroidDashboard`: Display and search asteroid tracking data
-- `ImpactSimulator`: Interactive tool with sliders for simulating asteroid impact scenarios
-- `AIChat`: Chat interface with typing animation for AI-powered analysis
-- `MLPredictor`: Machine learning prediction interface with form validation and visualization
-- `DataChart`: Chart.js wrapper for data visualizations (line, bar, doughnut charts)
+- `Panel` / `PanelHeader` / `Readout`: the surface and measurement primitives every view is built from
+- `Starfield`: canvas backdrop, reduced-motion and visibility aware, star count scaled to viewport
+- `RiskChip`: the only surface for the semantic risk ramp
+- `AsteroidCard`, `AsteroidDashboard`: catalogue rows plus a summary strip and charts derived from the same data
+- `ImpactSimulator`: slider-driven forward model with loading, empty, error, and result states
+- `AIChat`: analyst chat with a cleaned-up typewriter that clears its interval on unmount
+- `MLPredictor`: prediction form with full state coverage and recharts output
+- `DataChart`: Chart.js wrapper that reads its colours from the design tokens
+- `About`: capability summary and the published scaling relations the simulator evaluates
+
+**Client Libraries:**
+- `lib/impact.ts`: impact scaling after Collins, Melosh & Marcus (2005), validated against
+  Chelyabinsk, Tunguska, and Barringer Crater
+- `lib/format.ts`: shared number formatting so readouts agree on precision
+
+**Performance:**
+- Only the default tab is eager; the other four views are `React.lazy` code-split, keeping
+  recharts out of the initial bundle (~165 kB gzip initial, down from ~314 kB)
 
 ### Backend Architecture
 
@@ -117,7 +128,7 @@ Preferred communication style: Simple, everyday language.
 - **Date Handling**: date-fns for date manipulation and formatting
 
 **Font Dependencies:**
-- Google Fonts: Oxanium (200-800 weights) and Space Mono (regular/bold, normal/italic)
+- Google Fonts: Geist (300-700) and Geist Mono (300-600)
 - Loaded via preconnect and stylesheet links in HTML head
 
 **Development Tools:**

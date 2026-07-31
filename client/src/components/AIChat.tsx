@@ -1,163 +1,241 @@
-import { useState, useRef, useEffect } from 'react';
-import { GlassmorphicPanel } from './GlassmorphicPanel';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Panel } from './Panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send } from 'lucide-react';
+import { ArrowUp, RotateCcw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Message {
   id: string;
-  role: 'user' | 'ai';
+  role: 'user' | 'assistant';
   content: string;
-  typing?: boolean;
+  streaming?: boolean;
+  failed?: boolean;
 }
 
+const GREETING: Message = {
+  id: 'greeting',
+  role: 'assistant',
+  content:
+    'Console ready. Ask about tracked objects, impact scenarios, or deflection strategy.',
+};
+
+const PROMPTS = [
+  'How close will Apophis pass in 2029?',
+  'What is a kinetic impactor mission?',
+  'Which objects here are flagged hazardous?',
+];
+
 export function AIChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'ai',
-      content: 'PLANETARY DEFENCE HUB ONLINE. Ready to analyze asteroid threats and impact scenarios.',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([GREETING]);
   const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const typingRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    const node = scrollRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
   }, [messages]);
 
-  const simulateTyping = (text: string, messageId: string) => {
-    let currentText = '';
-    let index = 0;
-
-    const typeInterval = setInterval(() => {
-      if (index < text.length) {
-        currentText += text[index];
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === messageId ? { ...msg, content: currentText } : msg
-          )
-        );
-        index++;
-      } else {
-        clearInterval(typeInterval);
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === messageId ? { ...msg, typing: false } : msg
-          )
-        );
-        setIsTyping(false);
-      }
-    }, 30);
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || isTyping) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
+  // The typewriter runs on an interval; without this it survives unmount and
+  // keeps calling setState on a dead component.
+  useEffect(() => {
+    return () => {
+      if (typingRef.current !== null) window.clearInterval(typingRef.current);
     };
+  }, []);
 
-    setMessages((prev) => [...prev, userMessage]);
-    const currentInput = input;
-    setInput('');
-    setIsTyping(true);
+  const streamIn = useCallback((text: string, id: string) => {
+    if (typingRef.current !== null) window.clearInterval(typingRef.current);
 
-    try {
-      const response = await fetch('/api/chatbot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ question: currentInput }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from chatbot');
-      }
-
-      const data = await response.json();
-      const aiResponse = data.response || data.answer || data.message || 'No response received';
-
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: '',
-        typing: true,
-      };
-      setMessages((prev) => [...prev, aiMessage]);
-      
-      simulateTyping(aiResponse, aiMessage.id);
-    } catch (error) {
-      console.error('Error calling chatbot API:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: 'Error connecting to defense systems. Please try again.',
-        typing: false,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setIsTyping(false);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, content: text, streaming: false } : m)),
+      );
+      setBusy(false);
+      return;
     }
+
+    let index = 0;
+    typingRef.current = window.setInterval(() => {
+      // Step by a few characters so long answers do not take a minute to land.
+      index = Math.min(index + 3, text.length);
+      const slice = text.slice(0, index);
+      const done = index >= text.length;
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, content: slice, streaming: !done } : m)),
+      );
+
+      if (done && typingRef.current !== null) {
+        window.clearInterval(typingRef.current);
+        typingRef.current = null;
+        setBusy(false);
+      }
+    }, 16);
+  }, []);
+
+  const send = useCallback(
+    async (raw: string) => {
+      const question = raw.trim();
+      if (!question || busy) return;
+
+      const userMessage: Message = {
+        id: `u-${Date.now()}`,
+        role: 'user',
+        content: question,
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setInput('');
+      setBusy(true);
+
+      const replyId = `a-${Date.now()}`;
+
+      try {
+        const response = await fetch('/api/chatbot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+        });
+
+        if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
+
+        const data = await response.json();
+        const answer =
+          data.response || data.answer || data.message || 'The service returned an empty answer.';
+
+        setMessages((prev) => [
+          ...prev,
+          { id: replyId, role: 'assistant', content: '', streaming: true },
+        ]);
+        streamIn(answer, replyId);
+      } catch (err) {
+        console.error('Chatbot request failed:', err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: replyId,
+            role: 'assistant',
+            content: 'Could not reach the analyst service. Check your connection and try again.',
+            failed: true,
+          },
+        ]);
+        setBusy(false);
+      }
+    },
+    [busy, streamIn],
+  );
+
+  const reset = () => {
+    if (typingRef.current !== null) {
+      window.clearInterval(typingRef.current);
+      typingRef.current = null;
+    }
+    setMessages([GREETING]);
+    setInput('');
+    setBusy(false);
   };
+
+  const isFresh = messages.length === 1;
 
   return (
-    <GlassmorphicPanel className="flex flex-col h-[600px]" data-testid="panel-chat">
-      <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-primary/40">
-        <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
-        <h2 className="text-2xl font-bold text-primary font-sans" style={{ textShadow: '0 0 15px rgba(139, 92, 246, 0.5)' }}>
-          🤖 AI Defense Analyst
-        </h2>
-      </div>
+    <div className="mx-auto max-w-3xl">
+      <Panel className="flex h-[min(72dvh,640px)] flex-col" flush data-testid="panel-chat">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">
+              Defence analyst
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Answers are generated and may be wrong. Verify before acting.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={reset}
+            disabled={isFresh}
+            data-testid="button-reset-chat"
+          >
+            <RotateCcw aria-hidden="true" />
+            Clear
+          </Button>
+        </div>
 
-      <ScrollArea className="flex-1 pr-4 mb-4" ref={scrollRef}>
-        <div className="space-y-4">
+        <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={cn('flex', message.role === 'user' ? 'justify-end' : 'justify-start')}
               data-testid={`message-${message.role}-${message.id}`}
             >
               <div
-                className={`max-w-[80%] p-3 rounded-md font-mono text-sm ${
+                className={cn(
+                  'max-w-[85%] rounded-md px-3.5 py-2.5 text-sm leading-relaxed',
                   message.role === 'user'
-                    ? 'bg-accent/20 border border-accent text-foreground'
-                    : 'bg-primary/10 border border-primary text-primary'
-                }`}
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border border-border bg-foreground/[0.03] text-foreground',
+                  message.failed && 'border-status-critical/40 text-status-critical',
+                )}
               >
-                {message.content}
-                {message.typing && <span className="animate-pulse">_</span>}
+                <span className="whitespace-pre-wrap">{message.content}</span>
+                {message.streaming && (
+                  <span className="animate-caret ml-0.5 inline-block" aria-hidden="true">
+                    |
+                  </span>
+                )}
               </div>
             </div>
           ))}
-        </div>
-      </ScrollArea>
 
-      <div className="flex gap-2">
-        <Input
-          data-testid="input-chat"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Query defense systems..."
-          className="flex-1 bg-input border-primary font-mono text-foreground"
-          disabled={isTyping}
-        />
-        <Button
-          data-testid="button-send"
-          onClick={handleSend}
-          disabled={isTyping || !input.trim()}
-          size="icon"
+          {isFresh && (
+            <div className="pt-2">
+              <p className="field-label">Try asking</p>
+              <div className="mt-3 flex flex-col items-start gap-2">
+                {PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => send(prompt)}
+                    className="rounded-md border border-border px-3 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <form
+          className="flex items-center gap-2 border-t border-border px-5 py-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send(input);
+          }}
         >
-          <Send className="w-4 h-4" />
-        </Button>
-      </div>
-    </GlassmorphicPanel>
+          <Input
+            data-testid="input-chat"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about an object or a scenario"
+            aria-label="Message the defence analyst"
+            disabled={busy}
+            className="flex-1"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={busy || !input.trim()}
+            data-testid="button-send"
+            aria-label="Send message"
+          >
+            <ArrowUp aria-hidden="true" />
+          </Button>
+        </form>
+      </Panel>
+    </div>
   );
 }

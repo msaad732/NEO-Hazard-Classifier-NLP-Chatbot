@@ -7,7 +7,7 @@
     <meta name="description" content="Advanced asteroid impact simulation and tracking system with AI-powered planetary defense analysis." />
     
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#8b5cf6" />
+    <meta name="theme-color" content="#0f1116" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Neo-Sentinel" />
@@ -17,23 +17,11 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@300..600&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
+    <!-- Service worker registration lives in src/main.tsx so it can be gated to production builds. -->
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('Service Worker registered successfully:', registration.scope);
-            })
-            .catch((error) => {
-              console.log('Service Worker registration failed:', error);
-            });
-        });
-      }
-    </script>
   </body>
 </html>

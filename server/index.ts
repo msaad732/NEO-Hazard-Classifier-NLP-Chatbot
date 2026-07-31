@@ -64,7 +64,9 @@ app.use((req, res, next) => {
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
+    // Windows rejects SO_REUSEPORT with ENOTSUP, which crashes the listen call
+    // outright. It only matters for multi-process balancing, which we do not do.
+    ...(process.platform === "win32" ? {} : { reusePort: true }),
   }, () => {
     log(`serving on port ${port}`);
   });

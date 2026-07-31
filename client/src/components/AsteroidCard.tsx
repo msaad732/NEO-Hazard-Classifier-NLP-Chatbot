@@ -1,8 +1,10 @@
-import { GlassmorphicPanel } from './GlassmorphicPanel';
-import { Badge } from '@/components/ui/badge';
+import { Panel } from './Panel';
+import { RiskChip } from './RiskChip';
+import { formatNumber } from '@/lib/format';
 
 interface AsteroidCardProps {
   name: string;
+  designation: string;
   diameter: number;
   velocity: number;
   missDistance: number;
@@ -10,48 +12,75 @@ interface AsteroidCardProps {
   approachDate: string;
 }
 
+const APPROACH_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+function formatApproach(iso: string): string {
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? iso : APPROACH_FORMAT.format(parsed);
+}
+
 export function AsteroidCard({
   name,
+  designation,
   diameter,
   velocity,
   missDistance,
   hazardous,
   approachDate,
 }: AsteroidCardProps) {
+  const fields = [
+    { label: 'Diameter', value: formatNumber(diameter), unit: 'm', testid: 'diameter' },
+    { label: 'Rel. speed', value: formatNumber(velocity), unit: 'km/h', testid: 'velocity' },
+    {
+      label: 'Miss distance',
+      value: formatNumber(missDistance / 1000),
+      unit: 'k km',
+      testid: 'distance',
+    },
+    { label: 'Approach', value: formatApproach(approachDate), unit: '', testid: 'date' },
+  ];
+
   return (
-    <GlassmorphicPanel 
-      className="hover-elevate active-elevate-2 transition-all cursor-pointer hover:scale-105"
-      data-testid={`card-asteroid-${name}`}
+    <Panel
+      className="transition-colors hover:border-foreground/20"
+      data-testid={`card-asteroid-${designation}`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="text-primary font-bold text-lg font-mono" data-testid={`text-name-${name}`} style={{ textShadow: '0 0 10px rgba(139, 92, 246, 0.4)' }}>
-          ☄️ {name}
-        </h3>
-        {hazardous && (
-          <Badge variant="destructive" className="text-xs animate-pulse" data-testid={`badge-hazard-${name}`}>
-            ⚠️ HAZARD
-          </Badge>
-        )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3
+            className="truncate text-base font-semibold tracking-tight text-foreground"
+            data-testid={`text-name-${designation}`}
+          >
+            {name}
+          </h3>
+          <p className="mt-0.5 font-mono text-2xs text-muted-foreground tnum">({designation})</p>
+        </div>
+        <RiskChip
+          severity={hazardous ? 'high' : 'nominal'}
+          label={hazardous ? 'Hazardous' : 'Nominal'}
+          data-testid={`badge-hazard-${designation}`}
+        />
       </div>
-      
-      <div className="grid grid-cols-2 gap-3 text-sm font-mono">
-        <div>
-          <p className="text-muted-foreground">Diameter</p>
-          <p className="text-foreground" data-testid={`text-diameter-${name}`}>{diameter.toFixed(0)}m</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">Velocity</p>
-          <p className="text-foreground" data-testid={`text-velocity-${name}`}>{velocity.toFixed(0)} km/h</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">Miss Distance</p>
-          <p className="text-foreground" data-testid={`text-distance-${name}`}>{(missDistance / 1000).toFixed(0)}k km</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">Approach</p>
-          <p className="text-foreground" data-testid={`text-date-${name}`}>{approachDate}</p>
-        </div>
-      </div>
-    </GlassmorphicPanel>
+
+      <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-border pt-4">
+        {fields.map(({ label, value, unit, testid }) => (
+          <div key={label}>
+            <dt className="field-label">{label}</dt>
+            <dd
+              className="mt-1 font-mono text-sm text-foreground tnum"
+              data-testid={`text-${testid}-${designation}`}
+            >
+              {value}
+              {unit && <span className="ml-1 text-muted-foreground">{unit}</span>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Panel>
   );
 }

@@ -5,10 +5,11 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      /* Shape lock: 6px surfaces, 4px controls, 2px micro-labels. */
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        lg: ".375rem", /* 6px - panels, surfaces */
+        md: ".25rem", /* 4px - buttons, inputs, controls */
+        sm: ".125rem", /* 2px - badges, chips, micro-labels */
       },
       colors: {
         // Flat / base colors (regular buttons)
@@ -75,17 +76,24 @@ export default {
           foreground: "hsl(var(--sidebar-accent-foreground) / <alpha-value>)",
           border: "var(--sidebar-accent-border)"
         },
+        /**
+         * Semantic risk ramp, ordered low to high. These encode real assessed
+         * state only - never use them as decoration or as a second accent.
+         */
         status: {
-          online: "rgb(34 197 94)",
-          away: "rgb(245 158 11)",
-          busy: "rgb(239 68 68)",
-          offline: "rgb(156 163 175)",
+          nominal: "hsl(var(--status-nominal) / <alpha-value>)",
+          elevated: "hsl(var(--status-elevated) / <alpha-value>)",
+          high: "hsl(var(--status-high) / <alpha-value>)",
+          critical: "hsl(var(--status-critical) / <alpha-value>)",
         },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+      },
+      fontSize: {
+        "2xs": ["0.6875rem", { lineHeight: "1rem" }], /* 11px - dense table meta */
       },
       keyframes: {
         "accordion-down": {

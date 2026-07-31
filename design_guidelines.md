@@ -1,96 +1,105 @@
-# Planetary Defence Hub PWA - Design Guidelines
+# Neo-Sentinel Design Guidelines
 
-## I. Core Aesthetic Direction
-**Target Aesthetic:** Funky, Cool, Retro-Futuristic, Meteor Universe - A vibrant, high-energy space command center from a '90s sci-fi film that feels professional but electric.
+## I. Direction
 
-## II. Color Palette: Dark Mode / Neon Contrast
+**Scientific instrument, not sci-fi HUD.** Neo-Sentinel is a working planetary-defence
+console. It should read like precision measurement equipment: a cool graphite chassis,
+hairline rules instead of boxes, dense tabular numerals, and colour reserved almost
+entirely for data.
 
-**Background (The Void):** Deep, inky black or very dark navy blue (#0A0A1F)
+The audience is technical. Credibility comes from restraint and from numbers that hold up,
+not from glow effects.
 
-**Primary Accent (Data/Glow):** Electric Blue/Cyan (#00FFFF)
-- Use for active states, data points, and primary interface outlines
+Dials: `DESIGN_VARIANCE 5` / `MOTION_INTENSITY 3` / `VISUAL_DENSITY 7`.
 
-**Secondary Accents:**
-- Hot Magenta/Pink (#FF00FF) - warnings, key CTAs, secondary visualizations
-- Meteor Yellow/Orange (#FFD700) - warnings, key CTAs, secondary visualizations
+## II. The four locks
 
-**Text:** Pure White (#FFFFFF) for main body text ensuring maximum readability against dark background
+Audit these before shipping any change. They are what keep the interface coherent.
 
-## III. Typography: Sleek & Technical
+**Theme lock.** One dark theme, page-wide. No section inverts to light. Tokens live in
+`client/src/index.css` under a combined `:root, .dark` block.
 
-**Headlines/Titles:** Bold, futuristic, highly stylized sans-serif font (Centauri or similar) suggesting advanced technology
+**Colour lock.** Sodium orange `--primary` (`28 96% 55%`) is the only brand and interactive
+colour. It marks the active tab, the primary button, and the focus ring. Nothing else.
 
-**Body Text/Data:** Clean, readable monospaced font (Inconsolata or Space Mono) for data readouts, code snippets, and chat responses - maintaining terminal/HUD aesthetic
+The four `--status-*` hues are a semantic risk ramp (nominal, elevated, high, critical).
+They encode assessed state only and surface through `RiskChip`. They are never a second
+accent and never decoration. The five `--chart-*` values are the one categorical series
+ramp; charts read them off the document so they cannot drift from the theme.
 
-## IV. Background Atmosphere: Animated, Non-Obtrusive Universe 🌌
+**Shape lock.** 6px on surfaces (`rounded-lg`), 4px on controls (`rounded-md`), 2px on
+chips and micro-labels (`rounded-sm`). Circular is reserved for slider thumbs and switch
+knobs, where it is native form-control convention.
 
-**Critical Implementation:**
-- Entire background features subtle, continuous, low-contrast animation on low z-index
-- Elements: distant twinkling stars (low-opacity particles), slowly moving celestial bodies (planets/nebulas/meteors), very subtle parallax scrolling
-- **CONSTRAINT:** Motion must be slow and overall contrast low - acts as ambient atmosphere, NOT visual distraction
+**Motion lock.** Transitions acknowledge input; nothing loops for show. The ambient
+starfield is the only autonomous animation, and it stops under `prefers-reduced-motion`
+and while the tab is hidden. Every animation is gated behind a
+`prefers-reduced-motion: no-preference` query.
 
-## V. Readability Layer: The Planetary Hub Glass
+## III. Typography
 
-**All content containers must:**
-- Position above animated background layer
-- Semi-transparent dark overlay: `rgba(0, 0, 0, 0.7)` or similar
-- Use `backdrop-filter: blur(5px)` for Holographic/Glassmorphism effect
-- Guarantee legibility while letting universe animation subtly show through
+- **Geist** for interface text. Headings are `font-semibold tracking-tight`, not oversized.
+- **Geist Mono** for every number, identifier, and readout.
+- All numeric readouts carry tabular figures (the `.tnum` utility or `[data-numeric]`), so
+  digits never reflow as values change.
+- `.field-label` is the small-caps label that names a data value. It is **not** an eyebrow:
+  it never appears above a section heading.
 
-## VI. Required Animations & Interactions (Non-Negotiable)
+## IV. Surfaces and layout
 
-### A. Custom Cursor Effect ☄️
-- Replace default cursor with small, stylized comet/meteor icon (16x16px)
-- Generate continuous, fading particle trail in Electric Blue/Cyan as cursor moves
+`Panel` is the single surface primitive: a flat plate with a hairline border and a tinted
+shadow. Depth is never a glow.
 
-### B. Custom Loading Button/Spinner 🔄
-- Target: All primary CTA buttons ("Run Prediction," "Generate Report," "Simulate Impact")
-- On click: Replace button text with animated rotating meteor with flaming orange/yellow tail
+Group related values with `border-t` and `divide-*` rather than nesting cards. `Readout`
+renders one labelled measurement; a grid of them with hairline dividers is the default way
+to present results.
 
-### C. General UI Interactivity
-- **Neon Pulse:** Primary buttons/inputs exhibit subtle pulsating neon glow on hover/focus
-- **Holographic Pop-up:** Data windows/modals appear with translucent fade-in/scanline effect
+Container is `max-w-[1400px]`. Full-height uses `min-h-[100dvh]`, never `h-screen`.
+Every multi-column layout declares its single-column fallback below `md`.
 
-## VII. Component Styling
+Each section uses a distinct layout family: telemetry strip, chart grid, card grid,
+form/results split, chat column, and the asymmetric 5/7 prose split on About. Do not
+duplicate a family across sections.
 
-### A. Data Visualization Panels (Chart.js)
-- **Aesthetic:** HUD/Glassmorphism look
-- Semi-transparent blurred layer with sharply defined glowing borders (Electric Blue/Cyan)
-- Chart lines/bars/markers use vibrant neon accent colors
-- Gridlines: faint, thin, glowing - mirroring targeting system
+## V. Interaction states
 
-### B. AI Chatbot Interface
-- **Aesthetic:** Classic computer terminal/console output
-- Container uses semi-transparent blurred layer for readability
-- **AI Responses:** Electric Blue/Cyan accent color with smooth retro "typing" animation
-- **User Input:** Blinking cursor, crisp glowing border when active
+Every asynchronous surface ships four states, all of them present today in the simulator
+and the predictor:
 
-### C. Navigation
-- Clean, minimal global header/persistent sidebar
-- Semi-transparent overlay for visual consistency
-- Active link highlighted with solid, high-contrast glow using primary accent color
+- **Loading** - skeletons shaped like the real content, so nothing shifts on arrival.
+- **Empty** - names what the user should do next.
+- **Error** - states what failed and offers a retry.
+- **Success** - the result.
 
-## VIII. Layout Structure
+Contrast is verified, not assumed. Every text pair clears WCAG AA (4.5:1); the accent on
+its foreground sits at 7.3:1. Focus is one accent outline applied globally via
+`:focus-visible`.
 
-**Desktop:**
-- Full simulation/data dashboard with layered background and glassmorphic content containers
-- Multiple data visualization panels arranged in grid layout
-- Persistent AI chat interface (sidebar or bottom panel)
+## VI. Content honesty
 
-**Mobile/PWA:**
-- Responsive stack layout maintaining retro-futuristic aesthetic
-- Collapsible sections for data panels
-- Full-screen chat mode option
+This is the rule most easily lost.
 
-## IX. Images
-No hero images required - the animated cosmic background serves as the primary visual element. All content sits within glassmorphic containers above this animated layer.
+- Numbers on screen derive from the data actually displayed. The catalogue's summary strip
+  and both charts are computed from `CATALOGUE`, so they cannot disagree with the rows.
+- The simulator evaluates published scaling relations (Collins, Melosh & Marcus 2005), not
+  invented formulas. Its output is labelled as an order-of-magnitude estimate, and the
+  About panel lists the exact relations used.
+- Illustrative data is labelled illustrative. Diameters and designations in the catalogue
+  are published values; encounter speed and approach date are not yet live, and the UI
+  says so.
+- Generated answers carry a caveat. The analyst panel states that responses may be wrong.
 
-## X. Key Features to Implement
+## VII. Explicitly out
 
-1. **Asteroid Impact Simulator** - Interactive inputs with visual results
-2. **Real-time Asteroid Tracking Dashboard** - NASA NeoWs API data with neon-styled cards
-3. **Data Visualizations** - Impact probability, trajectory plots, size distribution charts
-4. **AI Conversational Core** - Terminal-style chatbot with typing animations
-5. **PWA Capabilities** - Manifest.json and service worker for offline use
+No emoji in UI copy. No neon or outer glows. No `textShadow` on headings. No custom
+cursors. No decorative status dots. No infinite float, wobble, or pulse animations. No
+`hover:scale` on content. No em-dashes in visible copy. No pure `#000` or `#fff`. No
+`window.addEventListener('scroll')` (use IntersectionObserver, or CSS scroll-driven
+animation).
 
-**Visual Priority:** Every element must maintain the electric, high-energy command center aesthetic while ensuring professional functionality and optimal readability through the glassmorphic layer system.
+## VIII. Performance
+
+Only the default tab is eager. The simulator, predictor, chat, and About load on demand,
+which keeps recharts out of the initial bundle (initial payload ~165 kB gzip against
+~314 kB when everything was eager). The starfield scales its star count to viewport area
+and caps device pixel ratio at 2.

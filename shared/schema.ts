@@ -63,6 +63,12 @@ export const mlPredictionOutputSchema = z.object({
   potentialDamage: z.string(),
   recommendedAction: z.string(),
   estimatedEnergy: z.number().optional(),
+  /**
+   * Which path produced this result. 'fallback' means the trained model was
+   * unreachable and a local heuristic answered instead; the UI must say so
+   * rather than presenting the heuristic as a model output.
+   */
+  source: z.enum(['model', 'fallback']).optional(),
 });
 
 export type MLPredictionOutput = z.infer<typeof mlPredictionOutputSchema>;

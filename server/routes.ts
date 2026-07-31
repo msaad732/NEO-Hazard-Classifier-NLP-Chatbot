@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { type EarthquakeEvent, type TsunamiAlert, mlPredictionInputSchema, type MLPredictionOutput } from "@shared/schema";
+import { type EarthquakeEvent, type TsunamiAlert, mlPredictionInputSchema, type MLPredictionInput, type MLPredictionOutput } from "@shared/schema";
 
 async function fetchEarthquakes(): Promise<EarthquakeEvent[]> {
   try {
@@ -66,6 +66,63 @@ async function fetchTsunamiAlerts(): Promise<TsunamiAlert[]> {
     console.error('Error fetching tsunami data:', error);
     return [];
   }
+}
+
+/**
+ * Local heuristic used when the trained model is unreachable.
+ *
+ * Every figure here is derived from the caller's own inputs, so the same request
+ * always yields the same answer and the reported probability cannot contradict
+ * the reported risk level. The result is tagged `source: 'fallback'` so the UI
+ * can label it instead of passing it off as a model output.
+ */
+function buildFallbackPrediction(input: MLPredictionInput): MLPredictionOutput {
+  const { diameter, velocity, distance, mass, trajectoryAngle } = input;
+
+  // Kinetic energy in megatons TNT, from the stated mass and speed.
+  const velocityMs = velocity * 1000;
+  const estimatedEnergy = (0.5 * mass * velocityMs ** 2) / 4.184e15;
+
+  // Closer approaches and steeper trajectories score higher. Bounded to 0-100.
+  const proximityScore = Math.min(1, 384_400 / Math.max(distance, 1));
+  const angleScore = Math.sin((trajectoryAngle * Math.PI) / 180);
+  const sizeScore = Math.min(1, diameter / 10);
+  const impactProbability = Number(
+    (Math.min(1, proximityScore * (0.55 + 0.45 * angleScore) * (0.35 + 0.65 * sizeScore)) * 100)
+      .toFixed(2),
+  );
+
+  const riskLevel: MLPredictionOutput['riskLevel'] =
+    estimatedEnergy >= 1e5 || impactProbability >= 75
+      ? 'critical'
+      : estimatedEnergy >= 1e3 || impactProbability >= 40
+        ? 'high'
+        : estimatedEnergy >= 10 || impactProbability >= 10
+          ? 'medium'
+          : 'low';
+
+  const damage: Record<MLPredictionOutput['riskLevel'], string> = {
+    low: 'Airburst likely. Limited ground effects.',
+    medium: 'City-scale destruction near the impact point.',
+    high: 'Regional devastation and measurable climate effects.',
+    critical: 'Global effects comparable to a mass-extinction impactor.',
+  };
+
+  const action: Record<MLPredictionOutput['riskLevel'], string> = {
+    low: 'Continue routine tracking.',
+    medium: 'Increase observation cadence and prepare civil response plans.',
+    high: 'Begin deflection mission planning and regional evacuation studies.',
+    critical: 'Immediate deflection mission and international coordination required.',
+  };
+
+  return {
+    impactProbability,
+    riskLevel,
+    potentialDamage: damage[riskLevel],
+    recommendedAction: action[riskLevel],
+    estimatedEnergy: Number(estimatedEnergy.toFixed(2)),
+    source: 'fallback',
+  };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -179,55 +236,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           redirect: 'follow',
         });
       } catch (fetchError: any) {
-        console.error('Error fetching from Streamlit app:', fetchError.message);
-        
-        const mockPrediction: MLPredictionOutput = {
-          impactProbability: parseFloat((Math.random() * 100).toFixed(2)),
-          riskLevel: diameter > 1 ? 'high' : velocity > 50 ? 'medium' : 'low',
-          potentialDamage: diameter > 1 
-            ? 'Significant regional damage expected' 
-            : 'Localized damage possible',
-          recommendedAction: diameter > 1 
-            ? 'Immediate evacuation and deflection mission required' 
-            : 'Continue monitoring and prepare response plans',
-          estimatedEnergy: parseFloat((diameter * velocity * 0.5).toFixed(2)),
-        };
-        
-        return res.json(mockPrediction);
+        console.error('ML model unreachable, using local heuristic:', fetchError.message);
+        return res.json(buildFallbackPrediction(validationResult.data));
       }
-
-      console.log('Response status:', response.status);
 
       if (!response.ok) {
-        console.log('Response not OK, using fallback prediction');
-        
-        const mockPrediction: MLPredictionOutput = {
-          impactProbability: parseFloat((Math.random() * 100).toFixed(2)),
-          riskLevel: diameter > 1 ? 'high' : velocity > 50 ? 'medium' : 'low',
-          potentialDamage: diameter > 1 
-            ? 'Significant regional damage expected' 
-            : 'Localized damage possible',
-          recommendedAction: diameter > 1 
-            ? 'Immediate evacuation and deflection mission required' 
-            : 'Continue monitoring and prepare response plans',
-          estimatedEnergy: parseFloat((diameter * velocity * 0.5).toFixed(2)),
-        };
-        
-        return res.json(mockPrediction);
+        console.warn(`ML model returned ${response.status}, using local heuristic`);
+        return res.json(buildFallbackPrediction(validationResult.data));
       }
 
-      const rawData = await response.json();
-      
+      // The upstream may answer 200 with an HTML app shell rather than JSON.
+      // Treat anything unparseable as unavailable instead of surfacing a crash.
+      let rawData: any;
+      try {
+        rawData = await response.json();
+      } catch {
+        console.warn('ML model returned a non-JSON body, using local heuristic');
+        return res.json(buildFallbackPrediction(validationResult.data));
+      }
+
       const transformedData: MLPredictionOutput = {
-        impactProbability: Number(rawData.impact_probability || rawData.impactProbability) || 0,
+        impactProbability: Number(rawData.impact_probability ?? rawData.impactProbability) || 0,
         riskLevel: (rawData.risk_level || rawData.riskLevel || 'low') as 'low' | 'medium' | 'high' | 'critical',
         potentialDamage: String(rawData.potential_damage || rawData.potentialDamage || 'Unknown'),
         recommendedAction: String(rawData.recommended_action || rawData.recommendedAction || 'Monitor closely'),
-        estimatedEnergy: rawData.estimated_energy || rawData.estimatedEnergy 
-          ? Number(rawData.estimated_energy || rawData.estimatedEnergy) 
+        estimatedEnergy: rawData.estimated_energy ?? rawData.estimatedEnergy
+          ? Number(rawData.estimated_energy ?? rawData.estimatedEnergy)
           : undefined,
+        source: 'model',
       };
-      
+
       res.json(transformedData);
     } catch (error) {
       console.error('Error calling ML model API:', error);

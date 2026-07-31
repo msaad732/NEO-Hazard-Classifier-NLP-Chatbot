@@ -1,173 +1,160 @@
-import { useState } from 'react';
-import { CosmicBackground } from '@/components/CosmicBackground';
-import { CustomCursor } from '@/components/CustomCursor';
-import { GlassmorphicPanel } from '@/components/GlassmorphicPanel';
-import { ImpactSimulator } from '@/components/ImpactSimulator';
-import { AIChat } from '@/components/AIChat';
+import { lazy, Suspense, useState } from 'react';
+import { Starfield } from '@/components/Starfield';
 import { AsteroidDashboard } from '@/components/AsteroidDashboard';
-import { MLPredictor } from '@/components/MLPredictor';
+import { Panel } from '@/components/Panel';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Activity, MessageSquare, BarChart3, Sparkles } from 'lucide-react';
+import { Activity, BarChart3, BookOpen, MessageSquare, Waves } from 'lucide-react';
+
+/**
+ * Only the default tab is eager. Recharts and the chat view are each a large
+ * dependency that most sessions never open, so they load on demand.
+ */
+const ImpactSimulator = lazy(() =>
+  import('@/components/ImpactSimulator').then((m) => ({ default: m.ImpactSimulator })),
+);
+const MLPredictor = lazy(() =>
+  import('@/components/MLPredictor').then((m) => ({ default: m.MLPredictor })),
+);
+const AIChat = lazy(() => import('@/components/AIChat').then((m) => ({ default: m.AIChat })));
+const About = lazy(() => import('@/components/About').then((m) => ({ default: m.About })));
+
+/** Placeholder shaped like the split panels it stands in for, so nothing jumps. */
+function SectionFallback() {
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <Panel className="lg:col-span-5">
+        <Skeleton className="h-5 w-40" />
+        <div className="mt-6 space-y-5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-full" />
+          ))}
+        </div>
+      </Panel>
+      <Panel className="min-h-[320px] lg:col-span-7">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="mt-6 h-[240px] w-full" />
+      </Panel>
+    </div>
+  );
+}
+
+const SECTIONS = [
+  { value: 'catalogue', label: 'Catalogue', icon: BarChart3 },
+  { value: 'simulator', label: 'Simulator', icon: Waves },
+  { value: 'predictor', label: 'Predictor', icon: Activity },
+  { value: 'analyst', label: 'Analyst', icon: MessageSquare },
+  { value: 'about', label: 'About', icon: BookOpen },
+] as const;
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [section, setSection] = useState<string>('catalogue');
 
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ cursor: 'none' }}>
-      <CosmicBackground />
-      <CustomCursor />
-      
-      <div className="relative z-10">
-        <header className="p-6 border-b-2 border-primary/40 bg-black/50 backdrop-blur-md">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Shield className="w-10 h-10 text-primary animate-pulse-glow" data-testid="icon-logo" />
-                <div>
-                  <h1 className="text-3xl font-bold text-primary font-sans tracking-wide" style={{ textShadow: '0 0 20px rgba(139, 92, 246, 0.6)' }}>
-                    NEO-SENTINEL
-                  </h1>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    Empowering Planetary Defense
-                  </p>
-                </div>
+    <div className="relative min-h-[100dvh] bg-background">
+      <Starfield />
+
+      <div className="relative z-10 flex min-h-[100dvh] flex-col">
+        {/* Utility bar. Single line at every breakpoint, 64px tall. */}
+        <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur-md">
+          <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-4 px-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <img
+                src="/icon-192.png"
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 shrink-0 rounded-md"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold tracking-tight text-foreground">
+                  Neo-Sentinel
+                </p>
+                <p className="truncate text-2xs text-muted-foreground">
+                  Planetary defence console
+                </p>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 border-2 border-primary rounded-full animate-pulse-glow">
-                <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
-                <span className="text-primary font-mono text-sm font-bold">ONLINE</span>
-              </div>
+            </div>
+
+            {/* Live semantic state: whether the console is connected to its services. */}
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-status-nominal" aria-hidden="true" />
+              <span className="font-mono text-2xs uppercase tracking-[0.12em] text-muted-foreground">
+                Systems nominal
+              </span>
             </div>
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto p-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <GlassmorphicPanel className="p-3">
-              <TabsList className="grid w-full grid-cols-5 bg-transparent gap-2">
-                <TabsTrigger 
-                  value="dashboard" 
-                  data-testid="tab-dashboard"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-mono text-sm sm:text-base transition-all hover:scale-105"
+        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 sm:py-8">
+          <Tabs value={section} onValueChange={setSection} className="space-y-6">
+            {/* Segmented control: hairline chassis, accent reserved for the active leaf. */}
+            <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg border border-border bg-card/60 p-1 backdrop-blur-sm">
+              {SECTIONS.map(({ value, label, icon: Icon }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  data-testid={`tab-${value}`}
+                  className="shrink-0 gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none hover:text-foreground data-[state=active]:hover:text-primary-foreground"
                 >
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  Dashboard
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  {label}
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="simulator" 
-                  data-testid="tab-simulator"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-mono text-sm sm:text-base transition-all hover:scale-105"
-                >
-                  <Activity className="w-4 h-4 mr-2" />
-                  Simulator
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="ml-predictor" 
-                  data-testid="tab-ml-predictor"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-mono text-sm sm:text-base transition-all hover:scale-105"
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  ML Predictor
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="chat" 
-                  data-testid="tab-chat"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-mono text-sm sm:text-base transition-all hover:scale-105"
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  AI Analyst
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="about" 
-                  data-testid="tab-about"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-mono text-sm sm:text-base transition-all hover:scale-105"
-                >
-                  <Shield className="w-4 h-4 mr-2" />
-                  About
-                </TabsTrigger>
-              </TabsList>
-            </GlassmorphicPanel>
+              ))}
+            </TabsList>
 
-            <TabsContent value="dashboard" className="space-y-6">
+            <TabsContent value="catalogue" className="mt-0 animate-panel-in">
               <AsteroidDashboard />
             </TabsContent>
 
-            <TabsContent value="simulator">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TabsContent value="simulator" className="mt-0 animate-panel-in">
+              <Suspense fallback={<SectionFallback />}>
                 <ImpactSimulator />
-                <GlassmorphicPanel funky>
-                  <h3 className="text-xl font-bold text-primary mb-4 font-sans" style={{ textShadow: '0 0 15px rgba(139, 92, 246, 0.5)' }}>
-                    🚀 Simulation Parameters
-                  </h3>
-                  <div className="space-y-4 font-mono text-sm">
-                    <div className="p-4 bg-primary/10 border-2 border-primary rounded-lg transition-all hover:scale-105 hover:bg-primary/20">
-                      <p className="text-muted-foreground mb-2">⚡ Energy Formula</p>
-                      <p className="text-foreground text-base">E = 0.5 × m × v²</p>
-                    </div>
-                    <div className="p-4 bg-secondary/10 border-2 border-secondary rounded-lg transition-all hover:scale-105 hover:bg-secondary/20">
-                      <p className="text-muted-foreground mb-2">💥 Crater Estimation</p>
-                      <p className="text-foreground text-base">D = 1.8 × (E^0.29)</p>
-                    </div>
-                    <div className="p-4 bg-accent/10 border-2 border-accent rounded-lg transition-all hover:scale-105 hover:bg-accent/20">
-                      <p className="text-muted-foreground mb-2">🌊 Seismic Impact</p>
-                      <p className="text-foreground text-base">M = log₁₀(E) + 3.5</p>
-                    </div>
-                  </div>
-                </GlassmorphicPanel>
-              </div>
+              </Suspense>
             </TabsContent>
 
-            <TabsContent value="ml-predictor">
-              <MLPredictor />
+            <TabsContent value="predictor" className="mt-0 animate-panel-in">
+              <Suspense fallback={<SectionFallback />}>
+                <MLPredictor />
+              </Suspense>
             </TabsContent>
 
-            <TabsContent value="chat">
-              <div className="max-w-4xl mx-auto">
+            <TabsContent value="analyst" className="mt-0 animate-panel-in">
+              <Suspense fallback={<SectionFallback />}>
                 <AIChat />
-              </div>
+              </Suspense>
             </TabsContent>
 
-            <TabsContent value="about">
-              <GlassmorphicPanel funky>
-                <h2 className="text-3xl font-bold text-primary mb-6 font-sans" style={{ textShadow: '0 0 20px rgba(139, 92, 246, 0.6)' }}>
-                  🛸 Mission Overview
-                </h2>
-                <div className="space-y-4 font-mono text-sm">
-                  <p className="text-foreground leading-relaxed text-base">
-                    The Planetary Defence Hub is an advanced monitoring and simulation system
-                    designed to track Near-Earth Objects (NEOs) and assess potential impact
-                    scenarios. Our AI-powered analysis provides real-time threat assessment
-                    and defensive strategy recommendations.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                    <div className="p-5 bg-primary/10 border-2 border-primary rounded-lg transition-all hover:scale-105 animate-float" style={{ animationDelay: '0s' }}>
-                      <h4 className="text-primary font-bold mb-2 text-base">🎯 Real-Time Tracking</h4>
-                      <p className="text-muted-foreground text-xs">
-                        Monitor asteroids using NASA's NeoWs API with live trajectory updates
-                      </p>
-                    </div>
-                    <div className="p-5 bg-secondary/10 border-2 border-secondary rounded-lg transition-all hover:scale-105 animate-float" style={{ animationDelay: '2s' }}>
-                      <h4 className="text-secondary font-bold mb-2 text-base">💥 Impact Simulation</h4>
-                      <p className="text-muted-foreground text-xs">
-                        Calculate devastation radius, seismic effects, and energy output
-                      </p>
-                    </div>
-                    <div className="p-5 bg-accent/10 border-2 border-accent rounded-lg transition-all hover:scale-105 animate-float" style={{ animationDelay: '4s' }}>
-                      <h4 className="text-accent font-bold mb-2 text-base">🤖 AI Analysis</h4>
-                      <p className="text-muted-foreground text-xs">
-                        Get intelligent threat assessments and defensive recommendations
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </GlassmorphicPanel>
+            <TabsContent value="about" className="mt-0 animate-panel-in">
+              <Suspense fallback={<SectionFallback />}>
+                <About />
+              </Suspense>
             </TabsContent>
           </Tabs>
         </main>
 
-        <footer className="mt-12 p-6 border-t-2 border-primary/40 bg-black/50 backdrop-blur-md">
-          <div className="max-w-7xl mx-auto text-center">
-            <p className="text-muted-foreground font-mono text-sm">
-              🌍 Planetary Defence Hub © 2025 | Protecting Earth from cosmic threats ☄️
+        <footer className="border-t border-border bg-background/85 backdrop-blur-md">
+          <div className="mx-auto flex max-w-[1400px] flex-col gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p>Neo-Sentinel, 2025. Impact estimates are order-of-magnitude only.</p>
+            <p>
+              Data sources:{' '}
+              <a
+                href="https://api.nasa.gov/"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-sm text-foreground underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
+              >
+                NASA NeoWs
+              </a>
+              {', '}
+              <a
+                href="https://earthquake.usgs.gov/earthquakes/feed/"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-sm text-foreground underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
+              >
+                USGS
+              </a>
             </p>
           </div>
         </footer>
