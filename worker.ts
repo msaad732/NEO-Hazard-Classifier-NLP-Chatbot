@@ -1,7 +1,17 @@
 import { type EarthquakeEvent, type TsunamiAlert, mlPredictionInputSchema, type MLPredictionInput, type MLPredictionOutput } from "./shared/schema";
 
 interface WorkerEnv {
-  CACHE: KVNamespace;
+  CACHE?: KVNamespace;
+}
+
+async function cacheGet(env: WorkerEnv, key: string): Promise<string | null> {
+  if (!env.CACHE) return null;
+  return env.CACHE.get(key);
+}
+
+async function cachePut(env: WorkerEnv, key: string, value: string): Promise<void> {
+  if (!env.CACHE) return;
+  await env.CACHE.put(key, value, { expirationTtl: 3600 });
 }
 
 async function fetchEarthquakes(): Promise<EarthquakeEvent[]> {
@@ -134,7 +144,7 @@ export default {
     try {
       // GET /api/earthquakes
       if (url.pathname === '/api/earthquakes' && request.method === 'GET') {
-        const cached = await env.CACHE.get('earthquakes');
+        const cached = await cacheGet(env, 'earthquakes');
         if (cached) {
           return new Response(cached, {
             headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -142,7 +152,7 @@ export default {
         }
 
         const earthquakes = await fetchEarthquakes();
-        await env.CACHE.put('earthquakes', JSON.stringify(earthquakes), { expirationTtl: 3600 });
+        await cachePut(env, 'earthquakes', JSON.stringify(earthquakes));
         return new Response(JSON.stringify(earthquakes), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
@@ -151,7 +161,7 @@ export default {
       // GET /api/earthquakes/refresh
       if (url.pathname === '/api/earthquakes/refresh' && request.method === 'GET') {
         const earthquakes = await fetchEarthquakes();
-        await env.CACHE.put('earthquakes', JSON.stringify(earthquakes), { expirationTtl: 3600 });
+        await cachePut(env, 'earthquakes', JSON.stringify(earthquakes));
         return new Response(JSON.stringify(earthquakes), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
@@ -159,7 +169,7 @@ export default {
 
       // GET /api/tsunami-alerts
       if (url.pathname === '/api/tsunami-alerts' && request.method === 'GET') {
-        const cached = await env.CACHE.get('tsunami-alerts');
+        const cached = await cacheGet(env, 'tsunami-alerts');
         if (cached) {
           return new Response(cached, {
             headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -167,7 +177,7 @@ export default {
         }
 
         const alerts = await fetchTsunamiAlerts();
-        await env.CACHE.put('tsunami-alerts', JSON.stringify(alerts), { expirationTtl: 3600 });
+        await cachePut(env, 'tsunami-alerts', JSON.stringify(alerts));
         return new Response(JSON.stringify(alerts), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
@@ -176,7 +186,7 @@ export default {
       // GET /api/tsunami-alerts/refresh
       if (url.pathname === '/api/tsunami-alerts/refresh' && request.method === 'GET') {
         const alerts = await fetchTsunamiAlerts();
-        await env.CACHE.put('tsunami-alerts', JSON.stringify(alerts), { expirationTtl: 3600 });
+        await cachePut(env, 'tsunami-alerts', JSON.stringify(alerts));
         return new Response(JSON.stringify(alerts), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });

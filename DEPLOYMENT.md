@@ -16,8 +16,7 @@ This guide explains how to deploy NEO Hazard Classifier with **Vercel** (fronten
 ### Step 1: Authenticate with Cloudflare
 
 ```bash
-npm install -g @wrangler/cli
-wrangler login
+npx wrangler login
 ```
 
 This opens your browser to authorize Cloudflare. Approve the login, then return to terminal.
@@ -25,8 +24,8 @@ This opens your browser to authorize Cloudflare. Approve the login, then return 
 ### Step 2: Create KV Namespace (for caching)
 
 ```bash
-wrangler kv:namespace create "CACHE"
-wrangler kv:namespace create "CACHE" --preview
+npx wrangler kv:namespace create "CACHE"
+npx wrangler kv:namespace create "CACHE" --preview
 ```
 
 Note the namespace IDs returned. Update `wrangler.toml`:
@@ -42,7 +41,7 @@ preview_id = "your-preview-id-here"
 
 ```bash
 npm run build:worker
-wrangler deploy
+npx wrangler deploy
 ```
 
 Wrangler will:
@@ -137,8 +136,8 @@ Same as above — frontend and backend deploy independently.
 
 ### Worker not responding
 ```bash
-wrangler tail  # View real-time logs
-wrangler logs  # View deployment logs
+npx wrangler tail  # View real-time logs
+npx wrangler logs  # View deployment logs
 ```
 
 ### Frontend can't reach backend
