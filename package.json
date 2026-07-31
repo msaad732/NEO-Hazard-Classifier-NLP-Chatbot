@@ -5,8 +5,13 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "npm run build:frontend && npm run build:worker",
+    "build:frontend": "vite build",
+    "build:worker": "esbuild worker.ts --platform=neutral --packages=external --bundle --format=esm --outfile=dist/worker.js --external:node",
+    "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
+    "deploy:worker": "wrangler deploy",
+    "deploy:vercel": "vercel",
     "check": "tsc",
     "db:push": "drizzle-kit push"
   },
@@ -98,7 +103,8 @@
     "tailwindcss": "^3.4.19",
     "tsx": "^4.20.5",
     "typescript": "5.6.3",
-    "vite": "^5.4.20"
+    "vite": "^5.4.20",
+    "wrangler": "^3.30.0"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
