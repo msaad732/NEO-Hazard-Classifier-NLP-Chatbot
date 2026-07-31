@@ -8,7 +8,10 @@ RUN npm ci
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+# This image runs the Node server (CMD is `npm start` -> dist/index.js), so it needs
+# build:server. The default `build` target produces the frontend and the Cloudflare
+# worker only, which would leave dist/index.js missing and crash the container.
+RUN npm run build:frontend && npm run build:server
 
 FROM base AS runner
 ENV NODE_ENV=production
