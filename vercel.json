@@ -2,5 +2,11 @@
   "buildCommand": "npm run build:frontend",
   "outputDirectory": "dist/public",
   "devCommand": "npm run dev",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://neo-hazard-classifier.neo-hazard-msaad.workers.dev/api/$1"
+    }
+  ]
 }
