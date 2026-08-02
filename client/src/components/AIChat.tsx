@@ -11,6 +11,7 @@ interface Message {
   content: string;
   streaming?: boolean;
   failed?: boolean;
+  waking?: boolean;
 }
 
 const GREETING: Message = {
@@ -26,12 +27,18 @@ const PROMPTS = [
   'Which objects here are flagged hazardous?',
 ];
 
+// The chatbot backend is on a free tier that sleeps after inactivity. The
+// first request after a while can take 30-50s to wake it up. Rather than
+// looking broken, we surface that as an explicit status after a short delay.
+const WAKE_HINT_DELAY_MS = 6000;
+
 export function AIChat() {
   const [messages, setMessages] = useState<Message[]>([GREETING]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingRef = useRef<number | null>(null);
+  const wakeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -43,6 +50,7 @@ export function AIChat() {
   useEffect(() => {
     return () => {
       if (typingRef.current !== null) window.clearInterval(typingRef.current);
+      if (wakeTimerRef.current !== null) window.clearTimeout(wakeTimerRef.current);
     };
   }, []);
 
@@ -52,7 +60,7 @@ export function AIChat() {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduceMotion) {
       setMessages((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, content: text, streaming: false } : m)),
+        prev.map((m) => (m.id === id ? { ...m, content: text, streaming: false, waking: false } : m)),
       );
       setBusy(false);
       return;
@@ -66,7 +74,7 @@ export function AIChat() {
       const done = index >= text.length;
 
       setMessages((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, content: slice, streaming: !done } : m)),
+        prev.map((m) => (m.id === id ? { ...m, content: slice, streaming: !done, waking: false } : m)),
       );
 
       if (done && typingRef.current !== null) {
@@ -93,6 +101,29 @@ export function AIChat() {
 
       const replyId = `a-${Date.now()}`;
 
+      // Show a placeholder immediately so the UI never looks idle.
+      setMessages((prev) => [
+        ...prev,
+        { id: replyId, role: 'assistant', content: 'Thinking…', streaming: false },
+      ]);
+
+      // If the response takes a while, it's almost certainly the free-tier
+      // backend cold-starting rather than something broken — say so.
+      wakeTimerRef.current = window.setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === replyId
+              ? {
+                  ...m,
+                  content:
+                    'Still waking up the assistant — this can take up to a minute on the first message…',
+                  waking: true,
+                }
+              : m,
+          ),
+        );
+      }, WAKE_HINT_DELAY_MS);
+
       try {
         const response = await fetch('/api/chatbot', {
           method: 'POST',
@@ -100,28 +131,39 @@ export function AIChat() {
           body: JSON.stringify({ question }),
         });
 
+        if (wakeTimerRef.current !== null) {
+          window.clearTimeout(wakeTimerRef.current);
+          wakeTimerRef.current = null;
+        }
+
         if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
 
         const data = await response.json();
         const answer =
           data.response || data.answer || data.message || 'The service returned an empty answer.';
 
-        setMessages((prev) => [
-          ...prev,
-          { id: replyId, role: 'assistant', content: '', streaming: true },
-        ]);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === replyId ? { ...m, content: '', streaming: true, waking: false } : m)),
+        );
         streamIn(answer, replyId);
       } catch (err) {
+        if (wakeTimerRef.current !== null) {
+          window.clearTimeout(wakeTimerRef.current);
+          wakeTimerRef.current = null;
+        }
         console.error('Chatbot request failed:', err);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: replyId,
-            role: 'assistant',
-            content: 'Could not reach the analyst service. Check your connection and try again.',
-            failed: true,
-          },
-        ]);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === replyId
+              ? {
+                  ...m,
+                  content: 'Could not reach the analyst service. Check your connection and try again.',
+                  failed: true,
+                  waking: false,
+                }
+              : m,
+          ),
+        );
         setBusy(false);
       }
     },
@@ -132,6 +174,10 @@ export function AIChat() {
     if (typingRef.current !== null) {
       window.clearInterval(typingRef.current);
       typingRef.current = null;
+    }
+    if (wakeTimerRef.current !== null) {
+      window.clearTimeout(wakeTimerRef.current);
+      wakeTimerRef.current = null;
     }
     setMessages([GREETING]);
     setInput('');
@@ -178,6 +224,7 @@ export function AIChat() {
                     ? 'bg-primary text-primary-foreground'
                     : 'border border-border bg-foreground/[0.03] text-foreground',
                   message.failed && 'border-status-critical/40 text-status-critical',
+                  message.waking && 'text-muted-foreground italic',
                 )}
               >
                 <span className="whitespace-pre-wrap">{message.content}</span>
