@@ -241,7 +241,7 @@ export default {
         const { diameter, velocity, distance, mass, trajectoryAngle } = validationResult.data;
 
         try {
-          const response = await fetch('https://nasa-hackathon-ml-model.streamlit.app/predict', {
+          const response = await fetch('https://ms732.pythonanywhere.com/predict',{
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
