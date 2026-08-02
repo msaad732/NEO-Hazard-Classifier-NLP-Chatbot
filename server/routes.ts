@@ -219,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let response;
       try {
-        response = await fetch('https://nasa-hackathon-ml-model.streamlit.app/predict', {
+        response = await fetch('https://ms732.pythonanywhere.com/predict', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
